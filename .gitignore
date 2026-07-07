@@ -1,0 +1,77 @@
+# ── Build artifacts ────────────────────────────────────────────────────────
+build/
+build-*/
+out/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+Makefile
+compile_commands.json
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+
+# The compiled binary itself — built per-device, not versioned
+terai
+terai-cpp/build
+
+# ── Editor / IDE ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.clangd/
+.cache/
+compile_commands.json
+
+# ── OS cruft ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── TerAI runtime data (user-specific, never commit) ──────────────────────
+# Config, API keys, history, patterns, daemon logs — all live in ~/.terai
+# outside the repo, but ignore local copies just in case they end up here.
+.terai/
+*.terai_backup
+config.json
+history.json
+patterns.json
+daemon.log
+daemon.pid
+gmail_credentials.json
+gmail_token.json
+drive_token.json
+
+# ── Secrets ────────────────────────────────────────────────────────────────
+*.env
+.env.*
+*.key
+*.pem
+**/secrets.json
+
+# ── Debug / sanitizer output ───────────────────────────────────────────────
+*.dSYM/
+/core
+core.[0-9]*
+vgcore.*
+asan.log*
+*.profraw
+*.gcda
+*.gcno
+
+# ── Packaging artifacts ────────────────────────────────────────────────────
+*.tar.gz
+*.zip
+*.deb
+
+# ── Third-party headers fetched at setup time (optional to track) ─────────
+# Uncomment if you'd rather re-download nlohmann/json than vendor it:
+# include/third_party/json.hpp
