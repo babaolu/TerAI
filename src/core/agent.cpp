@@ -2,6 +2,8 @@
 #include "core/agent.h"
 #include "providers/provider_factory.h"
 #include <iostream>
+#include <fstream>
+#include <cstdlib>
 #include <regex>
 #include <sstream>
 #include <algorithm>
@@ -263,7 +265,18 @@ void Agent::run_interactive() {
     Display::status("Provider : " + _provider->name() + " | Model: " + _provider->model());
     if (_tools) Display::status("Tools    : " + _tools->list_str());
     Display::separator();
-    std::cout << "Type 'exit' or Ctrl-C to quit. '/help' for commands.\n\n";
+    std::cout << "Type 'exit' or Ctrl-C to quit. '/help' for commands.\n";
+    std::cout << "Tip: for large pastes, use '/file <path>' to load a whole file as one prompt.\n\n";
+
+#ifdef HAVE_READLINE
+    // Without this, terminals that send bracketed-paste escape sequences
+    // (ESC[200~ ... ESC[201~) have each embedded newline in a paste treated
+    // as a real Enter press — a multi-line paste gets split into N separate
+    // submissions instead of arriving as one block. This tells readline to
+    // honor bracketed paste: embedded newlines become literal text in the
+    // buffer, and only the user's actual Enter key submits.
+    rl_variable_bind("enable-bracketed-paste", "on");
+#endif
 
     int reflection_every = _cfg.get<int>("self_improvement","reflection_after_n_turns","",5);
 
@@ -317,7 +330,7 @@ void Agent::run_interactive() {
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────
-bool Agent::handle_command(const std::string& input) {
+bool Agent::handle_command(std::string& input) {
     if (input == "/help")    { print_help();    return true; }
     if (input == "/history") { print_history(); return true; }
 
@@ -344,6 +357,34 @@ bool Agent::handle_command(const std::string& input) {
     if (input.rfind("/model ", 0) == 0) {
         switch_model(input.substr(7));
         return true;
+    }
+
+    if (input.rfind("/file ", 0) == 0) {
+        std::string path = input.substr(6);
+        while (!path.empty() && path.front() == ' ') path.erase(path.begin());
+        while (!path.empty() && path.back()  == ' ') path.pop_back();
+
+        // Expand leading ~
+        if (!path.empty() && path[0] == '~') {
+            const char* home = std::getenv("HOME");
+            if (home) path = std::string(home) + path.substr(1);
+        }
+
+        std::ifstream f(path);
+        if (!f) {
+            Display::error("Cannot open file: " + path);
+            return true;  // handled — nothing to submit
+        }
+        std::string content((std::istreambuf_iterator<char>(f)), {});
+        if (content.empty()) {
+            Display::error("File is empty: " + path);
+            return true;
+        }
+
+        std::cout << "[Loaded " << content.size() << " chars from " << path
+                   << " — submitting as one prompt]\n";
+        input = content;  // rewrite input; fall through to normal agent turn
+        return false;
     }
 
     return false;  // Not a command
@@ -373,6 +414,8 @@ TerAI Commands:
   /tokens           Show token usage and context utilisation
   /provider NAME    Switch provider  (anthropic, openai, gemini, openrouter, ollama, ...)
   /model NAME       Switch model
+  /file PATH        Load a whole file as one prompt (safer than pasting
+                     large multi-line text — avoids paste/terminal quirks)
   exit / quit       Save session and exit
 )";
 }

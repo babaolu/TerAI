@@ -64,6 +64,43 @@ static curl_slist* make_slist(const Headers& headers) {
 void HttpClient::global_init()    { curl_global_init(CURL_GLOBAL_DEFAULT); }
 void HttpClient::global_cleanup() { curl_global_cleanup(); }
 
+// ── GET (blocking) ─────────────────────────────────────────────────────────
+HttpResponse HttpClient::get(const std::string& url,
+                             const Headers&     headers,
+                             int                timeout_s)
+{
+    CURL* curl = curl_easy_init();
+    if (!curl) throw std::runtime_error("curl_easy_init failed");
+
+    HttpResponse resp;
+    curl_slist*  hlist = make_slist(headers);
+
+    curl_easy_setopt(curl, CURLOPT_URL,            url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPGET,        1L);   // explicit GET, not POST
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER,     hlist);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  write_string);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,      &resp.body);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT,        (long)timeout_s);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+
+    CURLcode rc = curl_easy_perform(curl);
+    if (rc != CURLE_OK) {
+        curl_slist_free_all(hlist);
+        curl_easy_cleanup(curl);
+        throw std::runtime_error(std::string("curl error: ") + curl_easy_strerror(rc));
+    }
+
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp.status);
+    curl_slist_free_all(hlist);
+    curl_easy_cleanup(curl);
+
+    if (!resp.ok()) {
+        throw std::runtime_error("HTTP " + std::to_string(resp.status) + ": " + resp.body);
+    }
+    return resp;
+}
+
 // ── POST (blocking) ───────────────────────────────────────────────────────────
 HttpResponse HttpClient::post(const std::string& url,
                               const std::string& body,

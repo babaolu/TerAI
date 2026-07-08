@@ -34,7 +34,10 @@ Options:
   --config              Print current configuration
   --daemon              Start background Ollama improvement daemon
   --daemon-stop         Stop running daemon
-  --daemon-status       Show daemon status and recent log
+  --daemon-status       Show daemon status, Ollama reachability, recent log
+  --daemon-test         Run ONE improvement cycle now, in the foreground,
+                          with output — verifies the daemon actually works
+                          without waiting for the timer or backgrounding
   -h, --help            Show this help
 
 Examples:
@@ -61,6 +64,7 @@ int main(int argc, char* argv[]) {
     bool do_daemon       = false;
     bool do_daemon_stop  = false;
     bool do_daemon_status= false;
+    bool do_daemon_test  = false;
     bool no_tools        = false;
     bool no_stream       = false;
     bool verbose         = false;
@@ -74,6 +78,7 @@ int main(int argc, char* argv[]) {
         if (arg == "--daemon")                       { do_daemon       = true; continue; }
         if (arg == "--daemon-stop")                  { do_daemon_stop  = true; continue; }
         if (arg == "--daemon-status")                { do_daemon_status= true; continue; }
+        if (arg == "--daemon-test")                  { do_daemon_test  = true; continue; }
         if (arg == "--no-tools")                     { no_tools        = true; continue; }
         if (arg == "--no-stream")                    { no_stream       = true; continue; }
         if (arg == "-v" || arg == "--verbose")       { verbose         = true; continue; }
@@ -116,6 +121,13 @@ int main(int argc, char* argv[]) {
 
     if (do_daemon_status) {
         BackgroundDaemon::status();
+        HttpClient::global_cleanup();
+        return 0;
+    }
+
+    if (do_daemon_test) {
+        BackgroundDaemon daemon(cfg);
+        daemon.run_test_cycle();
         HttpClient::global_cleanup();
         return 0;
     }

@@ -43,7 +43,7 @@ private:
     ToolCall    parse_action(const std::string& text) const;
     std::string extract_final(const std::string& text) const;
     void        reflect();
-    bool        handle_command(const std::string& input);
+    bool        handle_command(std::string& input);
     void        print_help() const;
     void        print_history() const;
 };

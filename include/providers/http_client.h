@@ -18,6 +18,11 @@ struct HttpResponse {
 
 class HttpClient {
 public:
+    // GET request — no body
+    static HttpResponse get(const std::string& url,
+                            const Headers&     headers,
+                            int                timeout_s = 10);
+
     // POST with full body returned
     static HttpResponse post(const std::string& url,
                              const std::string& body,

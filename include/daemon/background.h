@@ -12,7 +12,13 @@ public:
 
     void start();           // Fork and run
     static void stop();     // Send SIGTERM to running daemon
-    static void status();   // Print PID + last log lines
+    static void status();   // Print PID + last log lines + Ollama reachability
+
+    // Run exactly one improvement cycle in the foreground (no fork), with
+    // verbose stdout output. Use this to verify the daemon actually does
+    // something useful without waiting for the timer or backgrounding —
+    // e.g. `terai --daemon-test`.
+    void run_test_cycle();
 
 private:
     Config&     _cfg;
@@ -34,6 +40,9 @@ private:
     void log(const std::string& msg) const;
     static std::string expand(const std::string& p);
     static std::string now_str();
+
+    // Pings the configured Ollama base_url — returns true if it responds.
+    static bool check_ollama_reachable(const std::string& base_url);
 };
 
 } // namespace terai

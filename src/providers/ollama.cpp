@@ -36,7 +36,7 @@ json OllamaProvider::build_payload(const std::vector<Message>& messages,
 
 bool OllamaProvider::is_available() const {
     try {
-        HttpClient::post(_base_url + "/api/tags", "{}", {{"Content-Type","application/json"}}, 3);
+        HttpClient::get(_base_url + "/api/tags", {{"Content-Type","application/json"}}, 3);
         return true;
     } catch (...) {
         return false;

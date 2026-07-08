@@ -1,6 +1,8 @@
 // src/daemon/background.cpp
 #include "daemon/background.h"
 #include "providers/provider_factory.h"
+#include "providers/http_client.h"
+#include "core/config.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -259,20 +261,59 @@ void BackgroundDaemon::stop() {
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────
+bool BackgroundDaemon::check_ollama_reachable(const std::string& base_url) {
+    try {
+        Headers h = {{"Content-Type", "application/json"}};
+        HttpClient::get(base_url + "/api/tags", h, 3);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 void BackgroundDaemon::status() {
     const char* home = std::getenv("HOME");
     std::string base = home ? std::string(home) + "/.terai" : "/tmp";
     std::string pid_file = base + "/daemon.pid";
     std::string log_file = base + "/daemon.log";
 
+    // ── Process alive? ────────────────────────────────────────────────────
+    bool proc_alive = false;
     if (fs::exists(pid_file)) {
         std::ifstream f(pid_file);
         pid_t pid; f >> pid;
-        std::cout << "[Daemon running: PID " << pid << "]\n";
+        // kill(pid, 0) checks existence without sending a real signal
+        if (kill(pid, 0) == 0) {
+            std::cout << "[Daemon process: RUNNING — PID " << pid << "]\n";
+            proc_alive = true;
+        } else {
+            std::cout << "[Daemon process: NOT RUNNING — stale PID file (" << pid << ")]\n";
+        }
     } else {
-        std::cout << "[Daemon not running]\n";
+        std::cout << "[Daemon process: NOT RUNNING]\n";
     }
 
+    // ── Ollama actually reachable? ────────────────────────────────────────
+    // A running daemon process tells you nothing about whether it's doing
+    // useful work — if Ollama itself is down, every cycle silently fails.
+    Config cfg;
+    const json& dcfg = cfg.data().value("daemon", json::object());
+    std::string provider_name = dcfg.value("provider", "ollama");
+    std::string base_url = cfg.data()["providers"].value(provider_name, json::object())
+                                .value("base_url", "http://localhost:11434");
+
+    bool ollama_ok = check_ollama_reachable(base_url);
+    std::cout << "[Ollama server (" << base_url << "): "
+              << (ollama_ok ? "REACHABLE" : "NOT REACHABLE") << "]\n";
+
+    if (proc_alive && !ollama_ok) {
+        std::cout << "  ⚠ Daemon process is alive but cannot reach Ollama.\n"
+                     "    It will keep failing silently every cycle until\n"
+                     "    Ollama is started: run 'ollama serve' or check\n"
+                     "    that '" << base_url << "' is correct.\n";
+    }
+
+    // ── Recent log ─────────────────────────────────────────────────────────
     if (fs::exists(log_file)) {
         std::ifstream f(log_file);
         std::vector<std::string> lines;
@@ -282,7 +323,39 @@ void BackgroundDaemon::status() {
         int start = std::max(0, (int)lines.size() - 10);
         for (int i = start; i < (int)lines.size(); ++i)
             std::cout << "  " << lines[i] << "\n";
+        if (lines.empty())
+            std::cout << "  (log file exists but is empty — no cycle has completed yet)\n";
+    } else {
+        std::cout << "\n(no log file yet — daemon hasn't started a cycle)\n";
     }
+}
+
+void BackgroundDaemon::run_test_cycle() {
+    std::cout << "=== Running ONE improvement cycle synchronously (foreground) ===\n";
+
+    json prov_cfg = _cfg.data()["providers"].value(_provider_name, json::object());
+    std::string base_url = prov_cfg.value("base_url", "http://localhost:11434");
+    std::string effective_model = _model.empty()
+        ? prov_cfg.value("default_model", "(none configured)")
+        : _model;
+
+    std::cout << "Checking Ollama at " << base_url << " ... ";
+    if (!check_ollama_reachable(base_url)) {
+        std::cout << "NOT REACHABLE\n";
+        std::cout << "Cannot run test cycle — Ollama server did not respond to "
+                     "GET " << base_url << "/api/tags.\n"
+                     "Start it with 'ollama serve', or confirm the base_url in "
+                     "~/.terai/config.json is correct.\n"
+                     "Daemon would use model: " << effective_model << "\n";
+        return;
+    }
+    std::cout << "OK (model: " << effective_model << ")\n\n";
+
+    run_cycle();  // reuses the exact same logic the background loop uses
+
+    std::cout << "\n=== Test cycle complete — see output above for what happened ===\n";
+    std::cout << "If you saw '0 eligible files', check daemon.scan_paths and\n"
+                 "daemon.scan_extensions in ~/.terai/config.json match real files.\n";
 }
 
 } // namespace terai
