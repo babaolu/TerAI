@@ -49,7 +49,7 @@ LLMResponse OllamaProvider::complete(const std::vector<Message>& messages,
 {
     json body = build_payload(messages, system, max_tokens, temperature, false);
     Headers h = {{"Content-Type", "application/json"}};
-    auto resp = HttpClient::post(_base_url + "/api/chat", body.dump(), h, 300);
+    auto resp = HttpClient::post(_base_url + "/api/chat", body.dump(), h, _timeout_s);
     json data = json::parse(resp.body);
 
     LLMResponse out;

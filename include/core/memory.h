@@ -40,6 +40,10 @@ public:
     // History listing
     std::vector<json> history(int limit = 20) const;
 
+    // Load a past session's messages back into the current session by its
+    // id (as shown by /history). Returns false if no matching id is found.
+    bool load_session_by_id(const std::string& id);
+
 private:
     bool        _enabled;
     std::string _history_file;

@@ -96,6 +96,24 @@ std::vector<json> Memory::history(int limit) const {
     return h;
 }
 
+bool Memory::load_session_by_id(const std::string& id) {
+    auto h = load_history();
+    for (auto& entry : h) {
+        if (entry.value("id", "") != id) continue;
+
+        _session.clear();
+        for (auto& m : entry.value("messages", json::array())) {
+            _session.push_back({
+                m.value("role", ""),
+                m.value("content", ""),
+                m.value("ts", "")
+            });
+        }
+        return true;
+    }
+    return false;
+}
+
 // ── Patterns ──────────────────────────────────────────────────────────────────
 void Memory::load_patterns() {
     if (!fs::exists(_patterns_file)) return;

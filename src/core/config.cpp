@@ -61,10 +61,23 @@ json Config::defaults() {
             {"model",                      nullptr},
             {"pid_file",       "~/.terai/daemon.pid"},
             {"log_file",       "~/.terai/daemon.log"},
+            {"ledger_file",    "~/.terai/daemon_ledger.json"},
             {"scan_paths",     {"~/projects","~/code"}},
             {"scan_extensions", {".py",".js",".ts",".c",".cpp",".sh"}},
             {"improvement_interval_minutes", 30},
             {"max_files_per_cycle",           5},
+            // On-device CPU inference is much slower than a datacenter GPU.
+            // These defaults were tuned down from 300s/2048 tokens after
+            // real-world testing showed every larger file timing out at
+            // exactly 300s — most improvement tasks don't need anywhere
+            // near 2048 tokens of output.
+            {"request_timeout_seconds",     120},
+            {"max_tokens",                  768},
+            {"max_consecutive_timeouts",      2},
+            // If a scanned file lives inside a git repo, commit each
+            // successful change individually so it's diffable/revertable
+            // via normal git tooling instead of an opaque silent overwrite.
+            {"git_safety_net",             true},
             {"tasks", {"add_docstrings","improve_error_handling","suggest_optimizations"}}
         }},
         {"token_optimization", {

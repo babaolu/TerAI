@@ -387,6 +387,34 @@ bool Agent::handle_command(std::string& input) {
         return false;
     }
 
+    if (input.rfind("/resume ", 0) == 0) {
+        std::string id = input.substr(8);
+        while (!id.empty() && id.front() == ' ') id.erase(id.begin());
+        while (!id.empty() && id.back()  == ' ') id.pop_back();
+
+        if (!_memory.load_session_by_id(id)) {
+            Display::error("No saved session with id: " + id +
+                " (run /history to see available ids)");
+            return true;
+        }
+
+        auto msgs = _memory.session();
+        std::cout << "[Resumed session " << id << " — " << msgs.size()
+                   << " prior messages loaded]\n\n";
+
+        // Show a short recap so the user has context, not just a silent load
+        size_t recap_start = msgs.size() > 6 ? msgs.size() - 6 : 0;
+        if (recap_start > 0)
+            std::cout << "  ... (" << recap_start << " earlier messages not shown) ...\n\n";
+        for (size_t i = recap_start; i < msgs.size(); ++i) {
+            std::string preview = msgs[i].content.substr(0, 150);
+            if (msgs[i].content.size() > 150) preview += "...";
+            std::cout << "  [" << msgs[i].role << "] " << preview << "\n";
+        }
+        std::cout << "\nContinue the conversation below.\n";
+        return true;
+    }
+
     return false;  // Not a command
 }
 
@@ -416,6 +444,7 @@ TerAI Commands:
   /model NAME       Switch model
   /file PATH        Load a whole file as one prompt (safer than pasting
                      large multi-line text — avoids paste/terminal quirks)
+  /resume ID        Resume a past session by id (see /history for ids)
   exit / quit       Save session and exit
 )";
 }
@@ -429,6 +458,7 @@ void Agent::print_history() const {
         if (title.size() > 50) title = title.substr(0,50) + "...";
         std::cout << "  " << id << " — " << title << "\n";
     }
+    std::cout << "\nUse '/resume <id>' to continue any of these.\n";
 }
 
 } // namespace terai

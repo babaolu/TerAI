@@ -22,7 +22,14 @@ public:
     // Check if Ollama server is reachable
     bool is_available() const;
 
+    // On-device CPU inference can be far slower than a datacenter GPU —
+    // callers doing background/batch work should set a realistic timeout
+    // instead of hitting the 300s default on every large prompt.
+    void set_timeout(int seconds) { _timeout_s = seconds; }
+
 private:
+    int  _timeout_s = 300;
+
     json build_payload(const std::vector<Message>& messages,
                        const std::string& system,
                        int max_tokens, double temperature,
