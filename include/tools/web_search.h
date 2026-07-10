@@ -13,6 +13,9 @@ public:
     std::string description() const override {
         return "Search the internet for current information";
     }
+    std::string params_hint() const override {
+        return "query (string, required), max_results (int, optional, default 5)";
+    }
     ToolResult  run(const std::map<std::string,std::string>& args) override;
 
 private:

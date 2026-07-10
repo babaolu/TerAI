@@ -89,4 +89,22 @@ std::string Display::prompt_prefix() {
                + c(Colors::DIM, " ❯ ");
 }
 
+std::string Display::prompt_prefix_readline() {
+    if (!_color) return prompt_prefix();  // no escape codes to worry about
+
+    // \001 = RL_PROMPT_START_IGNORE, \002 = RL_PROMPT_END_IGNORE.
+    // Every raw ANSI sequence must be individually wrapped — the visible
+    // text ("you", " ❯ ") stays OUTSIDE the markers so readline still
+    // counts it toward the visible width, while the color codes around it
+    // are excluded from that count.
+    std::string out = "\n";
+    out += "\001" + std::string(Colors::BGREEN) + Colors::BOLD + "\002";
+    out += "you";
+    out += "\001" + std::string(Colors::RESET) + "\002";
+    out += "\001" + std::string(Colors::DIM) + "\002";
+    out += " ❯ ";
+    out += "\001" + std::string(Colors::RESET) + "\002";
+    return out;
+}
+
 } // namespace terai

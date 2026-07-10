@@ -11,6 +11,43 @@
 #ifdef HAVE_READLINE
 #  include <readline/readline.h>
 #  include <readline/history.h>
+#  include <cstring>
+
+namespace {
+
+// Known slash commands, kept in sync with Agent::handle_command / print_help.
+const char* kSlashCommands[] = {
+    "/help", "/history", "/clear", "/tokens",
+    "/provider", "/model", "/file", "/resume", nullptr
+};
+
+// Called once per candidate by rl_completion_matches. state==0 means "start
+// a new completion search"; subsequent calls continue from where it left
+// off. Must return malloc'd strings — readline frees them itself.
+char* command_generator(const char* text, int state) {
+    static int idx;
+    static size_t len;
+    if (state == 0) { idx = 0; len = std::strlen(text); }
+
+    while (kSlashCommands[idx]) {
+        const char* candidate = kSlashCommands[idx++];
+        if (std::strncmp(candidate, text, len) == 0)
+            return strdup(candidate);
+    }
+    return nullptr;
+}
+
+// Only offer our slash-command completions when completing the first word
+// of the line and it starts with '/'. Otherwise fall back to readline's
+// default filename completion (useful for /file <path> and /resume <id>
+// arguments, which we don't try to complete ourselves).
+char** terai_completion(const char* text, int start, int /*end*/) {
+    if (start == 0 && text[0] == '/')
+        return rl_completion_matches(text, command_generator);
+    return nullptr;
+}
+
+} // anonymous namespace
 #endif
 
 namespace terai {
@@ -30,7 +67,8 @@ THOUGHT: [Your reasoning about what to do]
 ACTION: [tool_name]
 ARGS: {"key": "value", "key2": "value2"}
 
-Supported tools: {TOOL_LIST}
+Supported tools (exact parameter names — use these exactly, do not guess):
+{TOOL_LIST}
 
 After seeing the OBSERVATION, continue with another THOUGHT/ACTION or:
 FINAL: [Your complete answer]
@@ -70,7 +108,7 @@ Agent::Agent(Config& cfg, Options opts)
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 std::string Agent::build_system() const {
-    std::string tool_list = _tools ? _tools->list_str() : "none";
+    std::string tool_list = _tools ? _tools->schema_str() : "none";
     std::string pattern_ctx = _memory.pattern_context();
     std::string extra = _cfg.get<std::string>("agent","system_prompt_extra","","");
 
@@ -155,8 +193,6 @@ std::string Agent::run_loop(const std::string& user_input) {
         LLMResponse resp;
 
         if (_opts.stream) {
-            // Stream tokens to terminal as they arrive
-            std::string label = Display::prompt_prefix();
             // Print the terai prefix once
             std::cout << "\n" << "\033[96m\033[1mterai\033[0m \033[2m❯\033[0m ";
             resp = _provider->stream(msgs, system, max_tok, temp,
@@ -276,6 +312,9 @@ void Agent::run_interactive() {
     // honor bracketed paste: embedded newlines become literal text in the
     // buffer, and only the user's actual Enter key submits.
     rl_variable_bind("enable-bracketed-paste", "on");
+
+    // Tab-completion for slash commands (/help, /provider, /resume, etc.)
+    rl_attempted_completion_function = terai_completion;
 #endif
 
     int reflection_every = _cfg.get<int>("self_improvement","reflection_after_n_turns","",5);
@@ -284,7 +323,7 @@ void Agent::run_interactive() {
         // ── Readline or fallback ──────────────────────────────────────────────
         std::string input;
 #ifdef HAVE_READLINE
-        char* line = readline(Display::prompt_prefix().c_str());
+        char* line = readline(Display::prompt_prefix_readline().c_str());
         if (!line) { std::cout << "\n"; break; }  // Ctrl-D
         input = line;
         if (!input.empty()) add_history(line);

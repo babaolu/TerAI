@@ -60,4 +60,12 @@ std::string ToolRegistry::list_str() const {
     return s;
 }
 
+std::string ToolRegistry::schema_str() const {
+    std::string s;
+    for (auto& [name, tool] : _tools) {
+        s += "- " + name + "(" + tool->params_hint() + ")\n";
+    }
+    return s;
+}
+
 } // namespace terai

@@ -34,9 +34,15 @@ bool ShellTool::is_blocked(const std::string& cmd) const {
 }
 
 ToolResult ShellTool::run(const std::map<std::string,std::string>& args) {
+    // Accept a couple of reasonable-but-wrong aliases defensively — smaller
+    // local models sometimes guess "cmd" instead of "command" even when the
+    // schema is shown in the system prompt. Better to just handle it than
+    // burn a full THOUGHT/ACTION/OBSERVATION round-trip on an error.
     auto it = args.find("command");
+    if (it == args.end()) it = args.find("cmd");
     if (it == args.end())
-        return {false, "Missing required argument: command", "shell"};
+        return {false, "Missing required argument: command "
+                "(also accepts 'cmd' as an alias)", "shell"};
 
     const std::string& cmd = it->second;
 

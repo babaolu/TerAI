@@ -37,6 +37,16 @@ public:
 
     static std::string prompt_prefix();
 
+    // Readline needs invisible bytes (ANSI color codes) wrapped in
+    // \001...\002 (RL_PROMPT_START_IGNORE/END_IGNORE) so it can correctly
+    // calculate the prompt's on-screen width. Without this, readline
+    // miscounts the prompt length and every subsequent keystroke's cursor
+    // math is wrong — symptom: new input overwrites old text on the same
+    // line instead of advancing normally. Use this variant specifically
+    // for the string passed to readline(); use prompt_prefix() for the
+    // plain std::cout fallback path.
+    static std::string prompt_prefix_readline();
+
 private:
     static bool _color;
     static int  _spinner_idx;

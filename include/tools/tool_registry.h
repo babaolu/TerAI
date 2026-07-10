@@ -20,6 +20,13 @@ public:
     virtual std::string name()        const = 0;
     virtual std::string description() const = 0;
     virtual ToolResult  run(const std::map<std::string,std::string>& args) = 0;
+
+    // Short parameter signature shown to the model, e.g.
+    // "command (string, required), timeout (int, optional)".
+    // Weaker/smaller local models guess wrong parameter names (e.g. "cmd"
+    // instead of "command") when they only see the tool name — this closes
+    // that gap by putting the real schema directly in the system prompt.
+    virtual std::string params_hint() const { return ""; }
 };
 
 // ── Registry ──────────────────────────────────────────────────────────────────
@@ -36,6 +43,11 @@ public:
 
     // Formatted list for display
     std::string list_str() const;
+
+    // Full "name(params...)" signatures for every registered tool — used in
+    // the system prompt so the model knows the exact expected argument
+    // names instead of guessing (e.g. "cmd" vs "command").
+    std::string schema_str() const;
 
 private:
     std::map<std::string, std::unique_ptr<BaseTool>> _tools;
