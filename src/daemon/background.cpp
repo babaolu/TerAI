@@ -93,6 +93,7 @@ BackgroundDaemon::BackgroundDaemon(Config& cfg) : _cfg(cfg) {
     _max_tokens                = dcfg.value("max_tokens", 768);
     _max_consecutive_timeouts  = dcfg.value("max_consecutive_timeouts", 2);
     _git_safety_net             = dcfg.value("git_safety_net", true);
+    _respect_gitignore          = dcfg.value("respect_gitignore", true);
 
     if (dcfg.contains("model") && !dcfg["model"].is_null())
         _model = dcfg["model"].get<std::string>();
@@ -103,6 +104,22 @@ BackgroundDaemon::BackgroundDaemon(Config& cfg) : _cfg(cfg) {
         _extensions.push_back(e.get<std::string>());
     for (auto& t : dcfg.value("tasks", json::array()))
         _tasks.push_back(t.get<std::string>());
+
+    // Vendor/build/dependency directories the daemon should never touch —
+    // this is what "10810 eligible files" turned out to be: an entire
+    // Python virtualenv's site-packages. Default list covers the common
+    // cases; user can override via daemon.exclude_dir_names in config.
+    if (dcfg.contains("exclude_dir_names")) {
+        for (auto& d : dcfg["exclude_dir_names"])
+            _exclude_dir_names.push_back(d.get<std::string>());
+    } else {
+        _exclude_dir_names = {
+            ".git", "node_modules", "venv", ".venv", "myenv", "env",
+            "site-packages", "__pycache__", "dist", "build", "vendor",
+            ".tox", ".mypy_cache", ".pytest_cache", "target", "out",
+            ".gradle", ".cxx", "cmake-build-debug", "cmake-build-release"
+        };
+    }
 
     fs::create_directories(fs::path(_pid_file).parent_path());
     fs::create_directories(fs::path(_log_file).parent_path());
@@ -227,6 +244,24 @@ void BackgroundDaemon::git_commit_change(const std::string& file_path,
 }
 
 // ── Collect eligible files ────────────────────────────────────────────────────
+bool BackgroundDaemon::is_excluded_path(const std::string& path) const {
+    for (auto& part : fs::path(path)) {
+        std::string name = part.string();
+        if (std::find(_exclude_dir_names.begin(), _exclude_dir_names.end(), name)
+            != _exclude_dir_names.end())
+            return true;
+    }
+    return false;
+}
+
+bool BackgroundDaemon::is_git_ignored(const std::string& path) const {
+    if (!_respect_gitignore) return false;
+    std::string dir  = fs::path(path).parent_path().string();
+    std::string name = fs::path(path).filename().string();
+    std::string cmd  = "cd '" + dir + "' && git check-ignore -q '" + name + "' 2>/dev/null";
+    return std::system(cmd.c_str()) == 0;  // exit 0 = is ignored
+}
+
 std::vector<std::string> BackgroundDaemon::collect_files() const {
     std::vector<std::string> files;
     for (auto& base : _scan_paths) {
@@ -235,9 +270,19 @@ std::vector<std::string> BackgroundDaemon::collect_files() const {
                 base, fs::directory_options::skip_permission_denied))
         {
             if (!entry.is_regular_file()) continue;
+
+            std::string path = entry.path().string();
+
+            // Cheap check first — path-component name matching against the
+            // exclude list. This alone would have skipped the entire
+            // myenv/site-packages tree instead of finding 10810 files there.
+            if (is_excluded_path(path)) continue;
+
             std::string ext = entry.path().extension().string();
-            if (std::find(_extensions.begin(), _extensions.end(), ext) != _extensions.end())
-                files.push_back(entry.path().string());
+            if (std::find(_extensions.begin(), _extensions.end(), ext) == _extensions.end())
+                continue;
+
+            files.push_back(path);
         }
     }
     return files;
@@ -258,6 +303,16 @@ std::vector<std::string> BackgroundDaemon::select_files(
 bool BackgroundDaemon::improve_file(const std::string& path, const std::string& task) {
     auto pit = IMPROVEMENT_PROMPTS.find(task);
     if (pit == IMPROVEMENT_PROMPTS.end()) return false;
+
+    // If the file's own project has marked it git-ignored (vendor code,
+    // build output, virtualenvs, etc.), respect that — it's an explicit
+    // signal the file isn't meant to be touched, and it also means any
+    // change we make can never be git-committed anyway.
+    if (is_git_ignored(path)) {
+        log("  ⤳ Skipping " + fs::path(path).filename().string() +
+            " — git-ignored by the project (not source code we should touch)");
+        return false;
+    }
 
     std::ifstream f(path);
     if (!f) return false;
@@ -285,8 +340,16 @@ bool BackgroundDaemon::improve_file(const std::string& path, const std::string& 
     std::unique_ptr<BaseProvider> provider;
     try {
         provider = ProviderFactory::create(prov_cfg);
-        if (auto* ollama = dynamic_cast<OllamaProvider*>(provider.get()))
+        if (auto* ollama = dynamic_cast<OllamaProvider*>(provider.get())) {
             ollama->set_timeout(_request_timeout_s);
+            // Keep the model loaded for the full sleep interval plus a
+            // small buffer, so the NEXT cycle's first request doesn't pay
+            // a cold model-load on top of generation time within the same
+            // 120s budget — this was the main reason timeouts kept
+            // recurring cycle after cycle even for small files.
+            int keep_alive_min = (_interval_s / 60) + 2;
+            ollama->set_keep_alive(std::to_string(keep_alive_min) + "m");
+        }
     } catch (...) { return false; }
 
     log("  Improving " + fs::path(path).filename().string() + " [" + task + "]"

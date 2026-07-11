@@ -23,7 +23,7 @@ json OllamaProvider::build_payload(const std::vector<Message>& messages,
     for (auto& m : messages)
         chat_msgs.push_back({{"role", m.role}, {"content", m.content}});
 
-    return {
+    json payload = {
         {"model",    _model},
         {"messages", chat_msgs},
         {"stream",   do_stream},
@@ -32,6 +32,8 @@ json OllamaProvider::build_payload(const std::vector<Message>& messages,
             {"num_predict", max_tokens}
         }}
     };
+    if (!_keep_alive.empty()) payload["keep_alive"] = _keep_alive;
+    return payload;
 }
 
 bool OllamaProvider::is_available() const {

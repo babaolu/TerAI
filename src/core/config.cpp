@@ -78,6 +78,18 @@ json Config::defaults() {
             // successful change individually so it's diffable/revertable
             // via normal git tooling instead of an opaque silent overwrite.
             {"git_safety_net",             true},
+            {"respect_gitignore",          true},
+            // Directories never scanned regardless of scan_paths — prevents
+            // exactly what happened in testing: scan_paths pointing at a
+            // broad project root ended up finding an entire Python
+            // virtualenv's site-packages (10810+ files) instead of just
+            // the user's own source. Override via daemon.exclude_dir_names.
+            {"exclude_dir_names", {
+                ".git", "node_modules", "venv", ".venv", "myenv", "env",
+                "site-packages", "__pycache__", "dist", "build", "vendor",
+                ".tox", ".mypy_cache", ".pytest_cache", "target", "out",
+                ".gradle", ".cxx", "cmake-build-debug", "cmake-build-release"
+            }},
             {"tasks", {"add_docstrings","improve_error_handling","suggest_optimizations"}}
         }},
         {"token_optimization", {

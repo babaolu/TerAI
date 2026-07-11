@@ -50,6 +50,8 @@ private:
     bool        _git_safety_net;
     std::vector<std::string> _scan_paths;
     std::vector<std::string> _extensions;
+    std::vector<std::string> _exclude_dir_names;
+    bool                      _respect_gitignore;
     std::vector<std::string> _tasks;
     std::string _provider_name;
     std::string _model;
@@ -61,6 +63,8 @@ private:
     bool improve_file(const std::string& path, const std::string& task);
     std::vector<std::string> collect_files() const;
     std::vector<std::string> select_files(const std::vector<std::string>& files) const;
+    bool is_excluded_path(const std::string& path) const;
+    bool is_git_ignored(const std::string& path) const;
 
     void log(const std::string& msg) const;
     static std::string expand(const std::string& p);
