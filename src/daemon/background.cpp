@@ -245,7 +245,7 @@ void BackgroundDaemon::git_commit_change(const std::string& file_path,
 
 // ── Collect eligible files ────────────────────────────────────────────────────
 bool BackgroundDaemon::is_excluded_path(const std::string& path) const {
-    for (auto& part : fs::path(path)) {
+    for (const auto& part : fs::path(path)) {
         std::string name = part.string();
         if (std::find(_exclude_dir_names.begin(), _exclude_dir_names.end(), name)
             != _exclude_dir_names.end())
