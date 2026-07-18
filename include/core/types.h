@@ -9,7 +9,6 @@
 
 namespace terai {
 
-// ── LLM Response ─────────────────────────────────────────────────────────────
 struct LLMResponse {
     std::string content;
     int         input_tokens  = 0;
@@ -21,14 +20,12 @@ struct LLMResponse {
     bool empty()       const { return content.empty(); }
 };
 
-// ── Chat message ─────────────────────────────────────────────────────────────
 struct Message {
     std::string role;     // "user" | "assistant" | "system"
     std::string content;
     std::string timestamp;
 };
 
-// ── Tool result ───────────────────────────────────────────────────────────────
 struct ToolResult {
     bool        success   = false;
     std::string output;
@@ -39,26 +36,17 @@ struct ToolResult {
     }
 };
 
-// ── Parsed tool call from LLM response ───────────────────────────────────────
 struct ToolCall {
     std::string                      name;
     std::map<std::string,std::string> args;
     bool valid = false;
 };
 
-// ── Token stream callback ─────────────────────────────────────────────────────
 using StreamCallback = std::function<void(const std::string& token)>;
 
-// ── Provider kind ─────────────────────────────────────────────────────────────
 enum class ProviderKind {
-    Anthropic,
-    OpenAI,
-    Gemini,
-    OpenRouter,
-    HuggingFace,
-    NvidiaNim,
-    Ollama,
-    Unknown
+    Anthropic, OpenAI, Gemini, OpenRouter, HuggingFace, NvidiaNim, Ollama,
+    LocalLlama, Unknown
 };
 
 } // namespace terai

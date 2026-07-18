@@ -37,6 +37,26 @@ if(READLINE_INCLUDE)
   include_directories(${READLINE_INCLUDE})
 endif()
 
+option(TERAI_ENABLE_LLAMA_CPP "Build with direct libllama.so linkage" OFF)
+
+if(TERAI_ENABLE_LLAMA_CPP)
+  set(LLAMA_CPP_DIR "" CACHE PATH "Path to your llama.cpp build (containing libllama.so and headers)")
+  if(NOT LLAMA_CPP_DIR)
+    message(FATAL_ERROR "Set -DLLAMA_CPP_DIR=/path/to/llama.cpp/build when TERAI_ENABLE_LLAMA_CPP=ON")
+  endif()
+
+  find_library(LLAMA_LIB llama PATHS "${LLAMA_CPP_DIR}" "${LLAMA_CPP_DIR}/lib" REQUIRED)
+  find_library(GGML_LIB  ggml  PATHS "${LLAMA_CPP_DIR}" "${LLAMA_CPP_DIR}/lib")
+
+  target_sources(terai PRIVATE src/providers/local_llama.cpp)
+  target_compile_definitions(terai PRIVATE TERAI_WITH_LLAMA_CPP)
+  target_include_directories(terai PRIVATE "${LLAMA_CPP_DIR}/include")
+  target_link_libraries(terai PRIVATE ${LLAMA_LIB})
+  if(GGML_LIB)
+    target_link_libraries(terai PRIVATE ${GGML_LIB})
+  endif()
+endif()
+
 # ── Source files ─────────────────────────────────────────────────────────────
 set(SOURCES
   src/main.cpp

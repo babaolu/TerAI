@@ -6,6 +6,10 @@
 #include "providers/ollama.h"
 #include <stdexcept>
 
+#ifdef TERAI_WITH_LLAMA_CPP
+#include "providers/local_llama.h"
+#endif
+
 namespace terai {
 
 std::unique_ptr<BaseProvider> ProviderFactory::create(const json& cfg) {
@@ -23,6 +27,10 @@ std::unique_ptr<BaseProvider> ProviderFactory::create(const json& cfg) {
 
     if (name == "ollama")
         return std::make_unique<OllamaProvider>(cfg);
+#ifdef TERAI_WITH_LLAMA_CPP
+    if (name == "local_llama")
+	return std::make_unique<LocalLlamaProvider>(cfg);
+#endif
 
     throw std::runtime_error("Unknown provider: '" + name +
         "'. Available: anthropic, openai, gemini, openrouter, "

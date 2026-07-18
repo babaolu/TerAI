@@ -14,13 +14,11 @@ class BaseProvider {
 public:
     virtual ~BaseProvider() = default;
 
-    // Blocking completion
     virtual LLMResponse complete(const std::vector<Message>& messages,
                                  const std::string& system    = "",
                                  int                max_tokens = 4096,
                                  double             temperature = 0.7) = 0;
 
-    // Streaming completion — calls cb per token, returns aggregated response
     virtual LLMResponse stream(const std::vector<Message>& messages,
                                const std::string& system    = "",
                                int                max_tokens = 4096,
@@ -37,8 +35,12 @@ protected:
     std::string _api_key;
     std::string _base_url;
 
-    // Convert terai::Message vector to JSON array (OpenAI format)
-    static json messages_to_json(const std::vector<Message>& msgs);
+    static json messages_to_json(const std::vector<Message>& msgs) {
+        json arr = json::array();
+        for (auto& m : msgs)
+            arr.push_back({{"role", m.role}, {"content", m.content}});
+        return arr;
+    }
 };
 
 } // namespace terai

@@ -30,7 +30,8 @@ json Config::defaults() {
             {"nvidia_nim",  {{"api_key",""},{"default_model","meta/llama-3.1-8b-instruct"},
                              {"base_url","https://integrate.api.nvidia.com/v1"}}},
             {"ollama",      {{"api_key",""},{"default_model","llama3.2"},
-                             {"base_url","http://localhost:11434"}}}
+                             {"base_url","http://localhost:11434"}}},
+	    {"local_llama", {{"model_path",""},{"n_gpu_layers",0},{"n_ctx",4096},{"n_threads",0},{"n_threads_batch",0}}}
         }},
         {"agent", {
             {"max_iterations",       10},
