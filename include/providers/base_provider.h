@@ -35,12 +35,7 @@ protected:
     std::string _api_key;
     std::string _base_url;
 
-    static json messages_to_json(const std::vector<Message>& msgs) {
-        json arr = json::array();
-        for (auto& m : msgs)
-            arr.push_back({{"role", m.role}, {"content", m.content}});
-        return arr;
-    }
+    static json messages_to_json(const std::vector<Message>& msgs);
 };
 
 } // namespace terai
